@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Рецепты из холодильника</title>
+  <link href="/static/css/style.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+<div class="bg-white p-6 rounded-xl shadow-md w-full max-w-lg">
+
+  <h1 class="text-2xl font-bold text-center mb-4">Загрузите фото холодильника</h1>
+  <p class="text-gray-600 text-sm mb-6 text-center">
+    Сделайте фото содержимого или выберите файл с устройства.
+  </p>
+
+  <!-- Форма загрузки -->
+  <form id="uploadForm" class="flex flex-col gap-4">
+    <input type="file" name="image" id="fileInput" class="border rounded-lg p-2">
+    <img id="preview" class="hidden mt-4 rounded-lg border" />
+    <button type="submit"
+            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg">
+      Загрузить
+    </button>
+  </form>
+
+  <!-- Результаты -->
+  <div id="result" class="mt-6"></div>
+
+</div>
+
+<script>
+const form = document.getElementById('uploadForm');
+const fileInput = document.getElementById('fileInput');
+const resultDiv = document.getElementById('result');
+const preview = document.getElementById('preview');
+
+// Показываем превью выбранного изображения
+fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+        preview.src = reader.result;
+        preview.classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+});
+
+// Асинхронная отправка на сервер
+form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!fileInput.files.length) return alert("Выберите файл");
+
+    const formData = new FormData();
+    formData.append("image", fileInput.files[0]);
+
+    resultDiv.innerHTML = `<p class="text-gray-500">Обработка...</p>`;
+
+    try {
+        const response = await fetch("/api/upload-photo", {
+            method: "POST",
+            body: formData
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            resultDiv.innerHTML = `<p class="text-red-600">Ошибка: ${err.detail || "Ошибка загрузки"}</p>`;
+            return;
+        }
+
+        const data = await response.json();
+        const ingredients = data.ingredients || [];
+        const recipes = data.recipes || [];
+
+        let html = "";
+        
+
+        // Отображаем ингредиенты
+        if (ingredients.length) {
+           console.log("type:", typeof ingredients);
+            console.log("isArray:", Array.isArray(ingredients));
+            console.log("value:", ingredients);
+            console.log("length:", ingredients.length);
+
+            html += `
+            <div class="mb-4 p-4 bg-yellow-50 rounded-lg shadow-sm">
+                <h2 class="text-lg font-semibold mb-2">Распознанные продукты:</h2>
+                <p class="text-gray-700">${ingredients.map(i => {
+                                            let s = i.name;
+                                            if (i.count) s += `: ${i.count}`;
+                                            if (i.unit) s += ` ${i.unit}`;
+                                            return s;
+                                        }).join(", ")}</p>
+            </div>`;
+        }
+
+        // Отображаем рецепты
+        if (recipes.length) {
+            html += recipes.map(recipe => `
+                <div class="p-4 mb-4 bg-gray-50 rounded-lg shadow-sm">
+                    <h2 class="text-lg font-semibold mb-1">${recipe.name}</h2>
+                    <p class="text-sm text-gray-700 mb-1">
+                        <strong>Ингредиенты:</strong> ${recipe.ingredients.join(', ')}
+                    </p>
+                    <p class="text-sm text-gray-700 mb-1">
+                        <strong>Калории:</strong> ${recipe.calories} ккал
+                    </p>
+                    <p class="text-sm text-gray-600 italic">${recipe.advice}</p>
+                </div>
+            `).join('');
+        } else {
+            html += `<p class="text-gray-500">Рецепты не найдены</p>`;
+        }
+
+        resultDiv.innerHTML = html;
+
+    } catch (error) {
+        resultDiv.innerHTML = `<p class="text-red-600">Ошибка: ${error.message}</p>`;
+    }
+});
+</script>
+
+</body>
+</html>
